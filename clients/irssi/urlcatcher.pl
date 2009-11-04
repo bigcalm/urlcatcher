@@ -1,161 +1,302 @@
-#!/usr/bin/perl -w
+#
+# URL catcher
+# This is an irssi script that watches configured channel(s) for URLS and stores them in a MySQL database.
+#
+# Usage: 
+#	1) Save this script in ~/.irssi/scripts
+#	-  Optionally edit the default values of the configuration at the end of this file
+#	2) Start irssi
+#	3) /script load urlcatcher
+#
 
 use strict;
-use DBI;
-use XML::Simple;
-# use Data::Dumper;
+use warnings;
 
-my $xml_settings =XMLin("/home/iain/.irssi/scripts/urlcatcher_settings.xml", forcearray => ['channel']);
-my $table_prefix = ($xml_settings->{database}->{table_prefix} != "\@NULL\@") ? $xml_settings->{database}->{table_prefix} : "";
-my $dbh;
+use DBI;
 
 use vars qw($VERSION %IRSSI);
-
-use Irssi qw(command_bind signal_add);
-$VERSION = '0.1';
+$VERSION = '0.2';
 %IRSSI = (
-    name        => 'URL catcher',
-    authors     => 'Iain Cuthbertson',
-    contact     => 'iain@urlcatcher.org',
-    url			=> 'http://urlcatcher.org/',
-    license     => 'GPL',
-    description => 'Watches set channel(s) for URLS and stores them in a MySQL database.',
+	name		=> 'URL catcher',
+	authors		=> 'Iain Cuthbertson',
+	contact		=> 'iain@urlcatcher.org',
+	url		=> 'http://urlcatcher.org/',
+	license		=> 'GPL',
+	description	=> 'Watches configured channel(s) for URLS and stores them in a MySQL database.',
 );
+use Irssi qw(signal_add);
+#use Irssi;
+#use Irssi::Irc;
 
-sub db_open {
-    my $db;
-	$db->{host} = $xml_settings->{database}->{db_host};
-	$db->{database} = $xml_settings->{database}->{db_name};
-	$db->{username} = $xml_settings->{database}->{db_user};
-	$db->{password} = $xml_settings->{database}->{db_pass};
 
-    $dbh = DBI->connect("dbi:mysql:database=$db->{database};host=$db->{host}",$db->{username},$db->{password});
-    $dbh->do("SET NAMES 'utf8'");
+
+
+sub handleSelf 
+{
+	my $network = $_[1]->{tag};
+	my $channel = $_[2]->{name};
+	my $nick = $_[1]->{nick};
+	my $msg = $_[0];
+	Irssi::print("HSDEBUG: network=$network; nick=$nick; target=$channel; msg=$msg");
+
+	if (checkMsg($network, $channel, $nick, $msg)) {
+		recordURL($network, $channel, $nick, $msg);
+	}
 }
 
-sub db_close {
-    $dbh->disconnect;
+sub handleRemote 
+{
+	my $network = $_[0]->{tag};
+	my $channel = $_[4];
+	my $nick = $_[2];
+	my $msg = $_[1];
+	Irssi::print("HRDEBUG: network=$network; nick=$nick; target=$channel; msg=$msg");
+
+	if (checkMsg($network, $channel, $nick, $msg)) {
+		recordURL($network, $channel, $nick, $msg);
+	}
 }
 
-sub handle_self {
-    my ($var1, $var2, $var3) = @_;
+sub checkMsg
+{
+	my $network = shift;
+	my $channel = shift;
+	my $nick = shift;
+	my $msg = shift;
 
-    my $server = $_[1]->{tag};
-    my $msg = $_[0];
-    my $nick = $_[1]->{nick};
-    my $target = $_[2]->{name};
+	if (!msgHasURL($msg)) { return 0; }
+	if (!isWatchedNetworkAndChannel($network, $channel)) { return 0; }
+	if (isIgnoredNick($nick)) { return 0; }
 
-    check_line($server, $msg, $nick, $target);    
+	return 1;
 }
 
-sub handle_remote {
-	my ($server, $msg, $nick, $address, $target) = @_;
-	
-	check_line($server->{tag}, $msg, $nick, $target);
-}
+sub msgHasURL 
+{
+	my $msg = shift;
 
-sub check_line {
-	my ($server, $msg, $nick, $target) = @_;
-	
 	my $urls = '(http|https|telnet|gopher|file|wais|ftp)';
 	my $ltrs = '\w';
 	my $gunk = '/#~:.?+=&;%@!\-';
 	my $punc = '.:?\-';
 	my $any  = "${ltrs}${gunk}${punc}";
 
-    my $ignore_list = "(http://urlcatcher.org|http://www.urlcatcher.org)"; # eg: "(http://goatse.cx/|http://www.google.com/)";
-
-	if (($msg !~ /$ignore_list/) && ($msg =~ /\b($urls:[$any]+?)(?=[$punc]*[^$any]|$)/igo)) {
-		# The current line contains a URL.  Record it for 
-		record_url($server, $msg, $nick, lc($target));
+	if ($msg !~ m/\b($urls:[$any]+?)(?=[$punc]*[^$any]|$)/igo) {
+		return 0;
 	}
+
+	my $ignoreURLs = Irssi::settings_get_str('ignore_urls');
+	if ($msg =~ m/($ignoreURLs)/i) { return 0; }
+
+	return 1;
 }
 
-sub record_url {
-	my ($server, $msg, $nick, $target) = @_;
-	# Check if $server and $target are a network/channel pair to watch
-	
-	my $continue = 0;
-	if (defined($xml_settings->{server}->{$server})) {
-	    for (my $i = 0; $i < @{$xml_settings->{server}->{$server}->{channel}}; $i++) {
-	        if (lc($xml_settings->{server}->{$server}->{channel}->[$i]) eq $target) {
-                $continue = 1;
-                last;
-	        }
-        }
+sub isWatchedNetworkAndChannel
+{
+	my $needleNetwork = lc(shift);
+	my $needleChannel = lc(shift);
+
+	my $channelList = Irssi::settings_get_str('channels');
+	my @watchedChannels = split(/;/, $channelList);
+
+	foreach my $watchedChannel (@watchedChannels) {
+		my @pair = split(/\//, $watchedChannel);
+
+		my $network  = lc($pair[0]);
+		my $channel = lc($pair[1]);
+		$network  =~ s/\s*//g;
+		$channel =~ s/\s*//g;
+
+		if (($needleNetwork eq $network) and ($needleChannel eq $channel)) {
+			return 1;
+		}
 	}
+
+	return 0;
+}
+
+sub isIgnoredNick
+{
+	my $needleNick = lc(shift);
+
+	my @nicks = split(/,/, Irssi::settings_get_str('ignore_nicks'));
+
+	foreach my $nick (@nicks) {
+		$nick = lc($nick);
+		$nick  =~ s/\s*//g;
+
+		if ($needleNick eq $nick) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+sub recordURL 
+{
+	my ($network, $channel, $nick, $msg) = @_;
 	
-	if ($continue == 0) {
-	    return;
+	my $tablePrefix = Irssi::settings_get_str('storage_table_prefix');
+
+	my $dbh = dbOpen();
+
+	# TODO: Cache channelId and nickId to reduce query hits to database
+	my $channelId = dbGetChannelId($dbh, $tablePrefix, $network, $channel);
+	if (!$channelId) { return 0; }
+
+	my $nickId = dbGetNickId($dbh, $tablePrefix, $nick);
+	if (!$nickId) { return 0; }
+
+	$msg = sanitise($msg);
+
+	my $sth = $dbh->prepare("INSERT INTO $tablePrefix" . "urls (channel_id, created_when, nick_id, message_line) VALUES (?, NOW(), ?, ?)");
+	my $rv = $sth->execute($channelId, $nickId, $msg);
+	if (!defined($rv)) {
+		Irssi::print("ERROR: Execute of INSERT query failed in recordURL.");
+		return 0;
+	}
+	Irssi::print("Added URL from $nick whilst watching $channel ($network)");
+
+	dbClose($dbh);
+
+	return 1;
+}
+
+sub dbOpen 
+{
+	my $dataSource = sprintf('dbi:%s:database=%s;host=%s;port=%u', 
+		Irssi::settings_get_str('storage_method'), 
+		Irssi::settings_get_str('storage_database'), 
+		Irssi::settings_get_str('storage_hostname'), 
+		Irssi::settings_get_int('storage_port'));
+
+	my $dbh = DBI->connect($dataSource, Irssi::settings_get_str('storage_username'), Irssi::settings_get_str('storage_password'));
+
+	if (!defined($dbh) or !$dbh) { 
+		die(sprintf("ERROR: Could not connect to database '%s' on '%s' as user '%s'. Message: %s\n", 
+				Irssi::settings_get_str('storage_database'), 
+				Irssi::settings_get_str('storage_hostname'), 
+				Irssi::settings_get_str('storage_username'), 
+				$DBI::errstr));
+	}
+
+	$dbh->do("SET NAMES 'utf8'");
+
+	return $dbh;
+}
+
+sub dbClose { my $dbh = shift; $dbh->disconnect; }
+
+sub dbGetChannelId
+{
+	my $dbh = shift;
+	my $tablePrefix = shift;
+	my $network = shift;
+	my $channel = shift;
+
+	Irssi::print("dbGetChannelId: $tablePrefix; $network; $channel");
+
+	$channel = lc($channel);
+
+	my $channelId = 0;
+
+	# Does the target already exist?
+	my $sth = $dbh->prepare("SELECT id FROM $tablePrefix" . "channels WHERE (name=?) AND (network=?)");
+	my $rv = $sth->execute($channel, $network);
+	if (!defined($rv)) {
+		Irssi::print("ERROR: Execute of SELECT query failed in dbGetChannelId.");
+		return 0;
+	}
+
+	if (!$sth->rows) {
+		$sth = $dbh->prepare("INSERT INTO $tablePrefix" . "channels (name, network) VALUES (?, ?)");
+		$rv = $sth->execute($channel, $network);
+		if (!defined($rv)) {
+			Irssi::print("ERROR: Execute of INSERT query failed in dbGetChannelId.");
+			return 0;
+		}
+		if ($rv) {
+			Irssi::print("Added channel: $channel ($network)");
+			$channelId = $dbh->last_insert_id(undef, undef, undef, undef);
+		}
 	} else {
-	    db_open();
-	    my $sql;
-	    my $result;
-	    my $channel_id = "";
-	    my $user_id = "";
-
-	    # Check if $target is in the database
-	    $sql = "SELECT id FROM " . $table_prefix . "channels WHERE name = '" . $target . "' AND server = '" . $server . "';";
-	    my $channel_data  =  $dbh->selectrow_hashref($sql);
-	    
-	    if (!defined($channel_data)) {
-	        $sql = "INSERT INTO " . $table_prefix . "channels (name, server) VALUES ('" . $target . "', '" . $server . "');";
-	        $result = $dbh->do($sql);
-	        if ($result) {
-                Irssi::print("Added channel: " . $target . " / " . $server);
-                $channel_id = $dbh->last_insert_id(undef, undef, undef, undef);
-	        }
-	    } else {
-	        $channel_id = $channel_data->{id};
-	    }
-
-	    # Check if $nick is in the database
-	    $sql = "SELECT id FROM " . $table_prefix . "users WHERE nick = '" . $nick . "';";
-	    my $user_data = $dbh->selectrow_hashref($sql);
-	    
-	    if(!defined($user_data)) {
-	        $sql = "INSERT INTO " . $table_prefix . "users (nick, created_when) VALUES ('" . $nick . "', NOW());";
-	        $result = $dbh->do($sql);
-	        if ($result) {
-                Irssi::print("Added user: " . $nick . " whilst watching " . $target . " / " . $server);
-                $user_id = $dbh->last_insert_id(undef, undef, undef, undef);
-	        }
-	    } else {
-	        $user_id = $user_data->{id};
-	    }
-
-        # Last of all, enter the whole message line into the urls table
-        if (($channel_id ne "") && ($user_id ne "")) {
-            $sql = "INSERT INTO " . $table_prefix . "urls (channel_id, created_when, user_id, message_line) VALUES (" . $channel_id . ", NOW(), " . $user_id . ", '" . sanitise($msg) . "');";
-	        $result = $dbh->do($sql) or Irssi::print("SQL Error: " . $sql);
-	        if ($result) {
-                Irssi::print("Added URL from " . $nick . " whilst watching " . $target . " / " . $server);
-	        }
-        }
-	    
-	    db_close();
+		my @row = $sth->fetchrow_array();
+		$channelId = $row[0];
 	}
-	
-    sub sanitise {
-        my $text = $_[0];
 
-        $text =~ s/\'/\\\'/g;
-        $text =~ s/\"/\\\"/g;
-
-        my $colourCode = chr(3);
-        $text =~ s/$colourCode\d{1,2}(,\d{1,2})*//g;
-
-        my $boldCode = chr(2);
-        $text =~ s/$boldCode//g;
-
-        return $text;
-    }
+	return $channelId;
 }
+
+sub dbGetNickId
+{
+	my $dbh = shift;
+	my $tablePrefix = shift;
+	my $nick = shift;
+
+	my $nickId = 0;
+
+	my $sth = $dbh->prepare("SELECT id FROM $tablePrefix" . "nicks WHERE (nick=?)");
+	my $rv = $sth->execute($nick);
+	if (!defined($rv)) {
+		Irssi::print("ERROR: Execute of SELECT query failed for dbGetNickId.");
+		return 0;
+	}
+
+	if (!$sth->rows) {
+		$sth = $dbh->prepare("INSERT INTO $tablePrefix" . "nicks (nick, created_when) VALUES (?, NOW())");
+		$rv = $sth->execute($nick);
+		if (!defined($rv)) {
+			Irssi::print("ERROR: Execute of INSERT query failed in dbGetNickId.");
+			return 0;
+		}
+		if ($rv) {
+			Irssi::print("Added nick: $nick");
+			$nickId = $dbh->last_insert_id(undef, undef, undef, undef);
+		}
+	} else {
+		my @row = $sth->fetchrow_array();
+		$nickId = $row[0];
+	}
+
+	return $nickId;
+}
+
+sub sanitise 
+{
+	my $text = shift;
+
+	my $colourCode = chr(3);
+	$text =~ s/$colourCode\d{1,2}(,\d{1,2})*//g;
+
+	my $boldCode = chr(2);
+	$text =~ s/$boldCode//g;
+
+	return $text;
+}
+
+
+Irssi::settings_add_str('urlcatcher', 'storage_method',   'mysql');
+Irssi::settings_add_str('urlcatcher', 'storage_hostname', 'localhost');
+Irssi::settings_add_int('urlcatcher', 'storage_port',     '3306');
+Irssi::settings_add_str('urlcatcher', 'storage_database', 'urlcatcher');
+Irssi::settings_add_str('urlcatcher', 'storage_username', 'uc_client');
+Irssi::settings_add_str('urlcatcher', 'storage_password', 'mj5S53dSekO5');
+Irssi::settings_add_str('urlcatcher', 'storage_table_prefix', '');
+
+# channels format     = NETWORK_1/CHANNEL_1; NETWORK_2/CHANNEL_2; NETWORK_N/CHANNEL_N; ...
+Irssi::settings_add_str('urlcatcher', 'channels', 'dhbit/#humour; dhbit/#urlcatcher; freenode/#vim');
+# ignore_nicks format = NICK_1,NICK_2,NICK_N,...
+Irssi::settings_add_str('urlcatcher', 'ignore_nicks', 'nicks1,nick2,nick3');
+# ignore_urls format  = URL_1|URL_2|URL_N|...
+Irssi::settings_add_str('urlcatcher', 'ignore_urls', 'http://urlcatcher.org|http://www.urlcatcher.org|http://goatse.cx/');
+
 
 # Check what we've been saying
-Irssi::signal_add('send text', 'handle_self');
-#Irssi::signal_add('message irc own_action', 'handle_self_action');
+Irssi::signal_add('send text', 'handleSelf');
+#Irssi::signal_add('message irc own_action', 'handleSelfAction');
 
 # Check what other people are saying
-Irssi::signal_add('message public', 'handle_remote');
-Irssi::signal_add('message irc action', 'handle_remote');
+Irssi::signal_add('message public', 'handleRemote');
+Irssi::signal_add('message irc action', 'handleRemote');
+

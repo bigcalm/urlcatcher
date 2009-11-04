@@ -28,6 +28,7 @@ use Irssi qw(signal_add);
 #use Irssi;
 #use Irssi::Irc;
 
+our %storageCache;
 
 
 
@@ -37,7 +38,7 @@ sub handleSelf
 	my $channel = $_[2]->{name};
 	my $nick = $_[1]->{nick};
 	my $msg = $_[0];
-	Irssi::print("HSDEBUG: network=$network; nick=$nick; target=$channel; msg=$msg");
+	#Irssi::print("HSDEBUG: network=$network; nick=$nick; target=$channel; msg=$msg");
 
 	if (checkMsg($network, $channel, $nick, $msg)) {
 		recordURL($network, $channel, $nick, $msg);
@@ -50,7 +51,7 @@ sub handleRemote
 	my $channel = $_[4];
 	my $nick = $_[2];
 	my $msg = $_[1];
-	Irssi::print("HRDEBUG: network=$network; nick=$nick; target=$channel; msg=$msg");
+	#Irssi::print("HRDEBUG: network=$network; nick=$nick; target=$channel; msg=$msg");
 
 	if (checkMsg($network, $channel, $nick, $msg)) {
 		recordURL($network, $channel, $nick, $msg);
@@ -67,8 +68,25 @@ sub checkMsg
 	if (!msgHasURL($msg)) { return 0; }
 	if (!isWatchedNetworkAndChannel($network, $channel)) { return 0; }
 	if (isIgnoredNick($nick)) { return 0; }
+	if (isMsgDupe($network, $channel, $nick, $msg)) { return 0; }
 
 	return 1;
+}
+
+sub isMsgDupe
+{
+	my $network = shift;
+	my $channel = shift;
+	my $nick = shift;
+	my $msg = shift;
+
+	my $lastMsg = cacheGet("lastmsg-$network-$channel-$nick");
+	if (defined($lastMsg) and ($lastMsg eq $msg)) { 
+		Irssi::print("Ignoring duplicate message from $nick."); 
+		return 1; 
+	}
+
+	return 0;
 }
 
 sub msgHasURL 
@@ -158,6 +176,8 @@ sub recordURL
 	}
 	Irssi::print("Added URL from $nick whilst watching $channel ($network)");
 
+	cacheSet("lastmsg-$network-$channel-$nick", $msg);
+
 	dbClose($dbh);
 
 	return 1;
@@ -195,13 +215,15 @@ sub dbGetChannelId
 	my $network = shift;
 	my $channel = shift;
 
-	Irssi::print("dbGetChannelId: $tablePrefix; $network; $channel");
-
+	$network = lc($network);
 	$channel = lc($channel);
 
-	my $channelId = 0;
+	my $channelId = cacheGet("channel-$network-$channel");
+	if (defined($channelId)) {
+		#Irssi::print("Using cached value for dbGetChannelId.");
+		return $channelId;
+	}
 
-	# Does the target already exist?
 	my $sth = $dbh->prepare("SELECT id FROM $tablePrefix" . "channels WHERE (name=?) AND (network=?)");
 	my $rv = $sth->execute($channel, $network);
 	if (!defined($rv)) {
@@ -225,6 +247,8 @@ sub dbGetChannelId
 		$channelId = $row[0];
 	}
 
+	cacheSet("channel-$network-$channel", $channelId);
+
 	return $channelId;
 }
 
@@ -234,7 +258,11 @@ sub dbGetNickId
 	my $tablePrefix = shift;
 	my $nick = shift;
 
-	my $nickId = 0;
+	my $nickId = cacheGet("nick-$nick");
+	if (defined($nickId)) {
+		#Irssi::print("Using cached value for dbGetNickId.");
+		return $nickId;
+	}
 
 	my $sth = $dbh->prepare("SELECT id FROM $tablePrefix" . "nicks WHERE (nick=?)");
 	my $rv = $sth->execute($nick);
@@ -259,7 +287,28 @@ sub dbGetNickId
 		$nickId = $row[0];
 	}
 
+	cacheSet("nick-$nick", $nickId);
+
 	return $nickId;
+}
+
+sub cacheGet
+{
+	my $key = shift;
+
+	if (exists($storageCache{$key})) {
+		return $storageCache{$key};
+	}
+
+	return undef;
+}
+
+sub cacheSet
+{
+	my $key = shift;
+	my $value = shift;
+
+	$storageCache{$key} = $value;
 }
 
 sub sanitise 

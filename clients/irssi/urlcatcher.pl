@@ -157,25 +157,19 @@ sub is_ignored_nick
 sub record_url 
 {
 	my ($network, $channel, $nick, $msg) = @_;
-	
-	my $table_prefix = Irssi::settings_get_str('storage_table_prefix');
 
 	my $dbh = db_open();
 
-	my $channel_id = db_get_channel_id($dbh, $table_prefix, $network, $channel);
+	my $channel_id = db_get_channel_id($dbh, $network, $channel);
 	if (!$channel_id) { return 0; }
 
-	my $nick_id = db_get_nick_id($dbh, $table_prefix, $nick);
+	my $nick_id = db_get_nick_id($dbh, $nick);
 	if (!$nick_id) { return 0; }
 
 	$msg = sanitise($msg);
 
-	my $sth = $dbh->prepare("INSERT INTO $table_prefix" . "urls (channel_id, created_when, nick_id, message_line) VALUES (?, NOW(), ?, ?)");
-	my $rv = $sth->execute($channel_id, $nick_id, $msg);
-	if (!defined($rv)) {
-		Irssi::print("ERROR: Execute of INSERT query failed in record_url.");
-		return 0;
-	}
+    my $rv = db_insert_url($dbh, $channel_id, $nick_id, $msg);
+    if (!$rv) { return 0; }
 	Irssi::print("Added URL from $nick whilst watching $channel ($network)");
 
 	cache_set("lastmsg-$network-$channel-$nick", $msg);
@@ -213,7 +207,6 @@ sub db_close { my $dbh = shift; $dbh->disconnect; }
 sub db_get_channel_id
 {
 	my $dbh = shift;
-	my $table_prefix = shift;
 	my $network = shift;
 	my $channel = shift;
 
@@ -223,7 +216,9 @@ sub db_get_channel_id
 	my $channel_id = cache_get("channel-$network-$channel");
 	if (defined($channel_id)) { return $channel_id; }
 
-	my $sth = $dbh->prepare("SELECT id FROM $table_prefix" . "channels WHERE (name=?) AND (network=?)");
+    my $channels_table_name = Irssi::settings_get_str('storage_table_prefix') . 'channels';
+
+	my $sth = $dbh->prepare("SELECT id FROM $channels_table_name WHERE (name=?) AND (network=?)");
 	my $rv = $sth->execute($channel, $network);
 	if (!defined($rv)) {
 		Irssi::print("ERROR: Execute of SELECT query failed in db_get_channel_id.");
@@ -231,7 +226,7 @@ sub db_get_channel_id
 	}
 
 	if (!$sth->rows) {
-		$sth = $dbh->prepare("INSERT INTO $table_prefix" . "channels (name, network) VALUES (?, ?)");
+		$sth = $dbh->prepare("INSERT INTO $channels_table_name (name, network) VALUES (?, ?)");
 		$rv = $sth->execute($channel, $network);
 		if (!defined($rv)) {
 			Irssi::print("ERROR: Execute of INSERT query failed in db_get_channel_id.");
@@ -254,13 +249,14 @@ sub db_get_channel_id
 sub db_get_nick_id
 {
 	my $dbh = shift;
-	my $table_prefix = shift;
 	my $nick = shift;
 
 	my $nick_id = cache_get("nick-$nick");
 	if (defined($nick_id)) { return $nick_id; }
 
-	my $sth = $dbh->prepare("SELECT id FROM $table_prefix" . "nicks WHERE (nick=?)");
+    my $nicks_table_name = Irssi::settings_get_str('storage_table_prefix') . 'nicks';
+
+	my $sth = $dbh->prepare("SELECT id FROM $nicks_table_name WHERE (nick=?)");
 	my $rv = $sth->execute($nick);
 	if (!defined($rv)) {
 		Irssi::print("ERROR: Execute of SELECT query failed for db_get_nick_id.");
@@ -268,7 +264,7 @@ sub db_get_nick_id
 	}
 
 	if (!$sth->rows) {
-		$sth = $dbh->prepare("INSERT INTO $table_prefix" . "nicks (nick, created_when) VALUES (?, NOW())");
+		$sth = $dbh->prepare("INSERT INTO $nicks_table_name (nick, created_when) VALUES (?, NOW())");
 		$rv = $sth->execute($nick);
 		if (!defined($rv)) {
 			Irssi::print("ERROR: Execute of INSERT query failed in db_get_nick_id.");
@@ -286,6 +282,25 @@ sub db_get_nick_id
 	cache_set("nick-$nick", $nick_id);
 
 	return $nick_id;
+}
+
+sub db_insert_url
+{
+    my $dbh = shift;
+    my $channel_id = shift;
+    my $nick_id = shift;
+    my $msg = shift;
+
+    my $urls_table_name = Irssi::settings_get_str('storage_table_prefix') . 'urls';
+
+	my $sth = $dbh->prepare("INSERT INTO $urls_table_name (channel_id, created_when, nick_id, message_line) VALUES (?, NOW(), ?, ?)");
+	my $rv = $sth->execute($channel_id, $nick_id, $msg);
+	if (!defined($rv)) {
+		Irssi::print("ERROR: Execute of INSERT query failed in record_url.");
+		return 0;
+	} else {
+        return 1;
+    }
 }
 
 sub cache_get

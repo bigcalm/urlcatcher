@@ -54,6 +54,7 @@ function text_to_light_colour($text)
 <html>
 <head>
 <title>URL catcher - Simple</title>
+<meta http-equiv="refresh" content="60">
 <style type="text/css">
 body {
     margin: 0;

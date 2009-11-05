@@ -4,9 +4,9 @@
 #
 # Usage: 
 #	1) Save this script in ~/.irssi/scripts
-#	-  Optionally edit the default values of the configuration at the end of this file
 #	2) Start irssi
 #	3) /script load urlcatcher
+#   4) Change config with /set commands
 #
 
 use strict;
@@ -20,7 +20,7 @@ $VERSION = '0.2';
 	name		=> 'URL catcher',
 	authors		=> 'Iain Cuthbertson',
 	contact		=> 'iain@urlcatcher.org',
-	url		=> 'http://urlcatcher.org/',
+	url 		=> 'http://urlcatcher.org/',
 	license		=> 'GPL',
 	description	=> 'Watches configured channel(s) for URLS and stores them in a MySQL database.',
 );
@@ -38,7 +38,6 @@ sub handleSelf
 	my $channel = $_[2]->{name};
 	my $nick = $_[1]->{nick};
 	my $msg = $_[0];
-	#Irssi::print("HSDEBUG: network=$network; nick=$nick; target=$channel; msg=$msg");
 
 	if (checkMsg($network, $channel, $nick, $msg)) {
 		recordURL($network, $channel, $nick, $msg);
@@ -51,7 +50,6 @@ sub handleRemote
 	my $channel = $_[4];
 	my $nick = $_[2];
 	my $msg = $_[1];
-	#Irssi::print("HRDEBUG: network=$network; nick=$nick; target=$channel; msg=$msg");
 
 	if (checkMsg($network, $channel, $nick, $msg)) {
 		recordURL($network, $channel, $nick, $msg);
@@ -159,7 +157,6 @@ sub recordURL
 
 	my $dbh = dbOpen();
 
-	# TODO: Cache channelId and nickId to reduce query hits to database
 	my $channelId = dbGetChannelId($dbh, $tablePrefix, $network, $channel);
 	if (!$channelId) { return 0; }
 
@@ -219,10 +216,7 @@ sub dbGetChannelId
 	$channel = lc($channel);
 
 	my $channelId = cacheGet("channel-$network-$channel");
-	if (defined($channelId)) {
-		#Irssi::print("Using cached value for dbGetChannelId.");
-		return $channelId;
-	}
+	if (defined($channelId)) { return $channelId; }
 
 	my $sth = $dbh->prepare("SELECT id FROM $tablePrefix" . "channels WHERE (name=?) AND (network=?)");
 	my $rv = $sth->execute($channel, $network);
@@ -259,10 +253,7 @@ sub dbGetNickId
 	my $nick = shift;
 
 	my $nickId = cacheGet("nick-$nick");
-	if (defined($nickId)) {
-		#Irssi::print("Using cached value for dbGetNickId.");
-		return $nickId;
-	}
+	if (defined($nickId)) { return $nickId; }
 
 	my $sth = $dbh->prepare("SELECT id FROM $tablePrefix" . "nicks WHERE (nick=?)");
 	my $rv = $sth->execute($nick);
@@ -298,9 +289,9 @@ sub cacheGet
 
 	if (exists($storageCache{$key})) {
 		return $storageCache{$key};
-	}
-
-	return undef;
+	} else {
+        return undef;
+    }
 }
 
 sub cacheSet
@@ -343,7 +334,6 @@ Irssi::settings_add_str('urlcatcher', 'ignore_urls', 'http://urlcatcher.org|http
 
 # Check what we've been saying
 Irssi::signal_add('send text', 'handleSelf');
-#Irssi::signal_add('message irc own_action', 'handleSelfAction');
 
 # Check what other people are saying
 Irssi::signal_add('message public', 'handleRemote');

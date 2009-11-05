@@ -99,7 +99,7 @@ while ($row = mysqli_fetch_assoc($result)) {
 <body>
 <?php
 
-$result = mysqli_query($dbh, 'select channels.id as `channel_id`, channels.name as `channel_name`, nicks.id as `nick_id`, nicks.nick as `nick_name`, urls.message_line as `message_line` from urls left join nicks on (urls.nick_id = nicks.id) left join channels on (urls.channel_id = channels.id) order by urls.id desc limit 1,50');
+$result = mysqli_query($dbh, 'select channels.id as `channel_id`, channels.name as `channel_name`, nicks.id as `nick_id`, nicks.nick as `nick_name`, urls.message_line as `message_line` from urls left join nicks on (urls.nick_id = nicks.id) left join channels on (urls.channel_id = channels.id) order by urls.id desc limit 0,50');
 
 if (!$result) {
     echo "<h1>Query of urls failed.</h1>";

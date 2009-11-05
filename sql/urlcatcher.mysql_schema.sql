@@ -1,5 +1,4 @@
 -- urlcatcher.mysql_schema.sql
--- original version
 
 --
 -- Table structure for table `channels`
@@ -11,7 +10,7 @@ CREATE TABLE `channels` (
   `name` varchar(255) NOT NULL,
   `server` varchar(255) NOT NULL,
   PRIMARY KEY  (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=11 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 
 --
@@ -25,7 +24,7 @@ CREATE TABLE `searches` (
   `search` varchar(255) NOT NULL,
   `ip_addr` varchar(255) NOT NULL,
   PRIMARY KEY  (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=158 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 
 --
@@ -54,7 +53,7 @@ CREATE TABLE `urls` (
   `message_line` varchar(255) NOT NULL,
   PRIMARY KEY  (`id`),
   FULLTEXT KEY `FULLTEXT` (`message_line`)
-) ENGINE=MyISAM AUTO_INCREMENT=16551 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 
 --
@@ -71,5 +70,5 @@ CREATE TABLE `users` (
   `last_when` datetime default NULL,
   `last_from` varchar(255) default NULL,
   PRIMARY KEY  (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=929 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 

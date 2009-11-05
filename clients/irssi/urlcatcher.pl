@@ -113,10 +113,15 @@ sub is_watched_channel
 	my $needle_channel = lc(shift);
 
 	my $channel_list = Irssi::settings_get_str('channels');
+    $channel_list =~ s/^\s*|\s*$//g;
+
+    if (($channel_list eq '') or ($channel_list eq '*')) { return 1; }
+
 	my @watched_channels = split(/;/, $channel_list);
 
 	foreach my $watched_channel (@watched_channels) {
 		my @pair = split(/\//, $watched_channel);
+        if (scalar(@pair) != 2) { next; }
 
 		my $network  = lc($pair[0]);
 		my $channel = lc($pair[1]);

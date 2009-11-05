@@ -91,7 +91,7 @@ sub msgHasURL
 {
 	my $msg = shift;
 
-	my $urls = '(http|https|telnet|gopher|file|wais|ftp)';
+	my $urls = '(http|https|ftp|spotify)';
 	my $ltrs = '\w';
 	my $gunk = '/#~:.?+=&;%@!\-';
 	my $punc = '.:?\-';

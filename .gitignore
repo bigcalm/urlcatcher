@@ -1,0 +1,4 @@
+.gitignore.swp
+clients/irssi/.urlcatcher.pl.swp
+servers/simple-web/.index.php.swp
+sql/.urlcatcher.mysql_schema.sql.swp

@@ -112,7 +112,21 @@ span.nick {
 <body>
 <?php
 
-$result = mysqli_query($dbh, 'select CONCAT(channel.network_id, channel.id, channel.name) as `channel_code`, channel.name as `channel_name`, CONCAT(nick.network_id, nick.id, nick.nick) as `nick_code`, nick.nick as `nick_name`, message.message_line as `message_line` from message left join nick on (message.nick_id = nick.id) left join channel on (message.channel_id = channel.id) order by message.id desc limit 0,50');
+$result = mysqli_query($dbh, 'SELECT 
+
+    channel.name AS `channel_name`, 
+    nick.nick AS `nick_name`, 
+    message.message_line AS `message_line`,
+    message.created_when AS `message_date`,
+    CONCAT(channel.network_id, channel.id, channel.name) AS `channel_code`, 
+    CONCAT(nick.network_id, nick.id, nick.nick) as `nick_code`
+
+    FROM message 
+    LEFT JOIN nick ON (message.nick_id = nick.id) 
+    LEFT JOIN channel ON (message.channel_id = channel.id) 
+
+    ORDER BY message.id DESC 
+    LIMIT 0,50');
 
 if (!$result) {
     echo "<h1>Query of urls failed.</h1>";
@@ -128,6 +142,7 @@ while ($row = mysqli_fetch_assoc($result)) {
     $channel_name = $row['channel_name'];
     $nick_name    = $row['nick_name'];
     $message_line = $row['message_line'];
+    $message_date = $row['message_date'];
     $channel_code = $row['channel_code'];
     $nick_code    = $row['nick_code'];
 
@@ -138,8 +153,24 @@ while ($row = mysqli_fetch_assoc($result)) {
     $channel_colour_bg = text_to_light_colour($channel_code);
     $nick_colour       = text_to_dark_colour($nick_code);
 
-    printf(
-        "<div class='channel' style='background-color:#%s'><span class='channel' style='color:#%s'>%s</span> <span class='nick' style='color:#%s'>&lt;%s&gt;</span> <span class='message'>%s</span></div>\n", 
+    # e.g.: Friday, 6th November 2009 @ 3:07 pm HKT
+    $message_date      = date('l, jS F Y @ g:i a T', 
+        mktime(
+            substr($message_date, 11, 2),
+            substr($message_date, 14, 2),
+            substr($message_date, 17, 2),
+            substr($message_date, 5, 2),
+            substr($message_date, 8, 2),
+            substr($message_date, 0, 4)
+        )
+    );
+
+    printf("
+        <div class='channel' style='background-color:#%s' title='$message_date'>
+        <span class='channel' style='color:#%s'>%s</span>
+        <span class='nick' style='color:#%s'>&lt;%s&gt;</span> 
+        <span class='message'>%s</span>
+        </div>\n", 
         $channel_colour_bg, 
         $channel_colour, 
         $channel_name, 

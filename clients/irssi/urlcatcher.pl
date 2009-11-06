@@ -13,7 +13,6 @@ use strict;
 use warnings;
 
 use DBI;
-use Data::Dumper;
 
 use vars qw($VERSION %IRSSI);
 $VERSION = '0.2';
@@ -26,8 +25,6 @@ $VERSION = '0.2';
 	description	=> 'Watches configured channel(s) for URLS and stores them in a MySQL database.',
 );
 use Irssi qw(signal_add);
-#use Irssi;
-#use Irssi::Irc;
 
 our %storage_cache;
 
@@ -78,11 +75,8 @@ sub is_msg_dupe
 	my $channel = shift;
 	my $nick = shift;
 	my $msg = shift;
-#Irssi::print("DEBUG: is msg dupe? lastmsg-$network-$channel-$nick");
 
 	my $last_msg = cache_get("lastmsg:$network/$channel/$nick");
-#if (defined($last_msg)) { Irssi::print("DEBUG: last_msg = $last_msg"); }
-#Irssi::print("DEBUG: msg = $msg");
 	if (defined($last_msg) and ($last_msg eq $msg)) { 
 		Irssi::print("Ignoring duplicate message from $nick."); 
 		return 1; 
@@ -191,15 +185,12 @@ sub record_url
 
 	my $network_id = db_get_network_id($dbh, $network);
 	if (!$network_id) { return 0; }
-    Irssi::print("Added network: $network");
 
 	my $channel_id = db_get_channel_id($dbh, $network_id, $channel);
 	if (!$channel_id) { return 0; }
-    Irssi::print("Added channel: $network/$channel");
 
 	my $nick_id = db_get_nick_id($dbh, $channel_id, $nick);
 	if (!$nick_id) { return 0; }
-    Irssi::print("Added nick: $network/$nick");
 
 	$msg = sanitise($msg);
 
@@ -267,6 +258,7 @@ sub db_get_network_id
 		}
 		if ($rv) {
 			$network_id = $dbh->last_insert_id(undef, undef, undef, undef);
+            Irssi::print("Added network: $network");
 		}
 	} else {
 		my @row = $sth->fetchrow_array();
@@ -307,6 +299,7 @@ sub db_get_channel_id
 		}
 		if ($rv) {
 			$channel_id = $dbh->last_insert_id(undef, undef, undef, undef);
+            Irssi::print("Added channel: $channel");
 		}
 	} else {
 		my @row = $sth->fetchrow_array();
@@ -345,6 +338,7 @@ sub db_get_nick_id
 		}
 		if ($rv) {
 			$nick_id = $dbh->last_insert_id(undef, undef, undef, undef);
+            Irssi::print("Added nick: $nick");
 		}
 	} else {
 		my @row = $sth->fetchrow_array();

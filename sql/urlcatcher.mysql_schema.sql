@@ -1,24 +1,35 @@
 -- urlcatcher.mysql_schema.sql
 
 --
--- Table structure for table `channels`
+-- Table structure for table `network`
 --
 
-DROP TABLE IF EXISTS `channels`;
-CREATE TABLE `channels` (
+DROP TABLE IF EXISTS `network`;
+CREATE TABLE `network` (
   `id` int(11) NOT NULL auto_increment,
   `name` varchar(255) NOT NULL,
-  `server` varchar(255) NOT NULL,
+  PRIMARY KEY  (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `channel`
+--
+
+DROP TABLE IF EXISTS `channel`;
+CREATE TABLE `channel` (
+  `id` int(11) NOT NULL auto_increment,
+  `network_id` int(11) NOT NULL,
+  `name` varchar(255) NOT NULL,
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 
 --
--- Table structure for table `searches`
+-- Table structure for table `search`
 --
 
-DROP TABLE IF EXISTS `searches`;
-CREATE TABLE `searches` (
+DROP TABLE IF EXISTS `search`;
+CREATE TABLE `search` (
   `id` int(11) NOT NULL auto_increment,
   `created_when` datetime NOT NULL,
   `search` varchar(255) NOT NULL,
@@ -31,8 +42,8 @@ CREATE TABLE `searches` (
 -- Table structure for table `tags`
 --
 
-DROP TABLE IF EXISTS `tags`;
-CREATE TABLE `tags` (
+DROP TABLE IF EXISTS `tag`;
+CREATE TABLE `tag` (
   `url_id` int(11) NOT NULL,
   `created_when` datetime NOT NULL,
   `nick_id` int(11) NOT NULL,
@@ -41,15 +52,15 @@ CREATE TABLE `tags` (
 
 
 --
--- Table structure for table `urls`
+-- Table structure for table `messages`
 --
 
-DROP TABLE IF EXISTS `urls`;
-CREATE TABLE `urls` (
+DROP TABLE IF EXISTS `message`;
+CREATE TABLE `message` (
   `id` int(11) NOT NULL auto_increment,
   `channel_id` int(11) NOT NULL,
   `created_when` datetime NOT NULL,
-  `user_id` int(11) NOT NULL,
+  `nick_id` int(11) NOT NULL,
   `message_line` varchar(255) NOT NULL,
   PRIMARY KEY  (`id`),
   FULLTEXT KEY `FULLTEXT` (`message_line`)
@@ -57,12 +68,38 @@ CREATE TABLE `urls` (
 
 
 --
--- Table structure for table `users`
+-- Table structure for table `url`
 --
 
-DROP TABLE IF EXISTS `users`;
-CREATE TABLE `users` (
+DROP TABLE IF EXISTS `url`;
+CREATE TABLE `url` (
   `id` int(11) NOT NULL auto_increment,
+  `url` varchar(255) NOT NULL,
+  `state_id` tinyint(2) NOT NULL,
+  `last_checked` datetime NOT NULL,
+  PRIMARY KEY  (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+
+--
+-- Table structure for table `url_message_join`
+--
+
+DROP TABLE IF EXISTS `url_message_join`;
+CREATE TABLE `url_message_join` (
+  `url_id` int(11) NOT NULL,
+  `message_id` int(11) NOT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+
+--
+-- Table structure for table `nick`
+--
+
+DROP TABLE IF EXISTS `nick`;
+CREATE TABLE `nick` (
+  `id` int(11) NOT NULL auto_increment,
+  `network_id` int(11) NOT NULL,
   `nick` varchar(50) NOT NULL,
   `email` varchar(100) default NULL,
   `password` varchar(100) default NULL,

@@ -31,7 +31,7 @@ CREATE TABLE `channel` (
 DROP TABLE IF EXISTS `search`;
 CREATE TABLE `search` (
   `id` int(11) NOT NULL auto_increment,
-  `created_when` datetime NOT NULL,
+  `created_at` datetime NOT NULL,
   `search` varchar(255) NOT NULL,
   `ip_addr` varchar(255) NOT NULL,
   PRIMARY KEY  (`id`)
@@ -45,7 +45,7 @@ CREATE TABLE `search` (
 DROP TABLE IF EXISTS `tag`;
 CREATE TABLE `tag` (
   `url_id` int(11) NOT NULL,
-  `created_when` datetime NOT NULL,
+  `created_at` datetime NOT NULL,
   `nick_id` int(11) NOT NULL,
   `tag` varchar(255) NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -59,7 +59,7 @@ DROP TABLE IF EXISTS `message`;
 CREATE TABLE `message` (
   `id` int(11) NOT NULL auto_increment,
   `channel_id` int(11) NOT NULL,
-  `created_when` datetime NOT NULL,
+  `created_at` datetime NOT NULL,
   `nick_id` int(11) NOT NULL,
   `message_line` varchar(255) NOT NULL,
   PRIMARY KEY  (`id`),
@@ -103,7 +103,7 @@ CREATE TABLE `nick` (
   `nick` varchar(50) NOT NULL,
   `email` varchar(100) default NULL,
   `password` varchar(100) default NULL,
-  `created_when` datetime NOT NULL,
+  `created_at` datetime NOT NULL,
   `last_when` datetime default NULL,
   `last_from` varchar(255) default NULL,
   PRIMARY KEY  (`id`)

@@ -330,7 +330,7 @@ sub db_get_nick_id
 	}
 
 	if (!$sth->rows) {
-		$sth = $dbh->prepare("INSERT INTO $nick_table_name (network_id, nick, created_when) VALUES (?, ?, NOW())");
+		$sth = $dbh->prepare("INSERT INTO $nick_table_name (network_id, nick, created_at) VALUES (?, ?, NOW())");
 		$rv = $sth->execute($network_id, $nick);
 		if (!defined($rv)) {
 			Irssi::print("ERROR: Execute of INSERT query failed in db_get_nick_id.");
@@ -361,7 +361,7 @@ sub db_insert_url
     my $url_table_name = Irssi::settings_get_str('storage_table_prefix') . 'url';
     my $url_message_join_table_name = Irssi::settings_get_str('storage_table_prefix') . 'url_message_join';
 
-	my $sth = $dbh->prepare("INSERT INTO $message_table_name (channel_id, created_when, nick_id, message_line) VALUES (?, NOW(), ?, ?)");
+	my $sth = $dbh->prepare("INSERT INTO $message_table_name (channel_id, created_at, nick_id, message_line) VALUES (?, NOW(), ?, ?)");
 	my $rv = $sth->execute($channel_id, $nick_id, $msg);
 	if (!defined($rv)) {
 		Irssi::print("ERROR: Execute of INSERT query on message table failed in db_insert_url.");

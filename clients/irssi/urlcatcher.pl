@@ -359,7 +359,7 @@ sub db_insert_url
 
     my $message_table_name = Irssi::settings_get_str('storage_table_prefix') . 'message';
     my $url_table_name = Irssi::settings_get_str('storage_table_prefix') . 'url';
-    my $url_message_join_table_name = Irssi::settings_get_str('storage_table_prefix') . 'url_message_join';
+    my $url_to_message_table_name = Irssi::settings_get_str('storage_table_prefix') . 'url_to_message';
 
 	my $sth = $dbh->prepare("INSERT INTO $message_table_name (channel_id, created_at, nick_id, message_line) VALUES (?, NOW(), ?, ?)");
 	my $rv = $sth->execute($channel_id, $nick_id, $msg);
@@ -411,10 +411,10 @@ sub db_insert_url
 
 #Irssi::print("DEBUG: joining...");
         # join this url to the message
-        $sth = $dbh->prepare("INSERT INTO $url_message_join_table_name (url_id, message_id) VALUES (?, ?)");
+        $sth = $dbh->prepare("INSERT INTO $url_to_message_table_name (url_id, message_id) VALUES (?, ?)");
         $rv = $sth->execute($url_id, $message_id);
         if (!defined($rv)) {
-            Irssi::print("ERROR: Execute of INSERT query on url_message_join table failed in db_insert_url.");
+            Irssi::print("ERROR: Execute of INSERT query on url_to_message table failed in db_insert_url.");
             next;
         }
 

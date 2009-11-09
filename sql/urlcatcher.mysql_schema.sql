@@ -82,11 +82,11 @@ CREATE TABLE `url` (
 
 
 --
--- Table structure for table `url_message_join`
+-- Table structure for table `url_to_message`
 --
 
-DROP TABLE IF EXISTS `url_message_join`;
-CREATE TABLE `url_message_join` (
+DROP TABLE IF EXISTS `url_to_message`;
+CREATE TABLE `url_to_message` (
   `url_id` int(11) NOT NULL,
   `message_id` int(11) NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;

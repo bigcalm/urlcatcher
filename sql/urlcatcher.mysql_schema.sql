@@ -1,5 +1,5 @@
 -- urlcatcher.mysql_schema.sql
-
+-- version 0.2
 --
 -- Table structure for table `network`
 --

@@ -117,7 +117,7 @@ $result = mysqli_query($dbh, 'SELECT
     channel.name AS `channel_name`, 
     nick.nick AS `nick_name`, 
     message.message_line AS `message_line`,
-    message.created_when AS `message_date`,
+    message.created_at AS `message_date`,
     CONCAT(channel.network_id, channel.id, channel.name) AS `channel_code`, 
     CONCAT(nick.network_id, nick.id, nick.nick) as `nick_code`
 

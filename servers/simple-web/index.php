@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL);
+require_once('functions_ui.php');
 
 /*
  *
@@ -6,8 +8,10 @@
  * Simple web interface to caught urls
  *
  */
+
+// todo: ignore urls we've already shown
 $NAME        = 'URL catcher - Simple Web UI';
-$VERSION     = '0.2';
+$VERSION     = '0.3-pool';
 $DESCRIPTION = 'Watches configured channel(s) for URLS and stores them in a MySQL database.';
 $AUTHORS     = 'Toby Oxborrow';
 $CONTACT     = 'toby@oxborrow.net';
@@ -23,59 +27,6 @@ $dbh = mysqli_connect($db_hostname, $db_username, $db_password, $db_database);
 if (!$dbh) {
     echo "<h1>Connection to database failed.</h1>";
     exit;
-}
-
-function urlify($text)
-{
-	$urls = '(http|https|telnet|gopher|file|wais|ftp)';
-	$ltrs = '\w';
-	$gunk = '\\/#~:.?+=&;%@!\-';
-	$punc = '.:?\-';
-	$any  = "$ltrs$gunk$punc";
-
-	$text = preg_replace("/\b($urls:[$any]+?)(?=[$punc]*[^$any]|$)/", "<a href='$1'>$1</a>", $text);
-    return $text;
-}
-
-function text_to_colour($text)
-{
-    // ensure enough characters to create a suitable hash
-    if (strlen($text) < 20) { $text .= "$text$text$text.kittens_kittens_kittens"; }
-
-    $rgb = substr( md5($text), 0, 6 );
-
-    return $rgb;
-}
-
-function text_to_dark_colour($text)
-{
-    if (strlen($text) < 20) { $text .= "$text$text$text.kittens_kittens_kittens"; }
-
-    $rgb = substr( md5($text), 0, 6 );
-
-    $r = substr($rgb, 0, 2);
-    $g = substr($rgb, 2, 2);
-    $b = substr($rgb, 4, 2);
-
-    if (hexdec($r) > 150) { $r = dechex(hexdec($r) - 100); }
-    if (hexdec($g) > 150) { $g = dechex(hexdec($g) - 100); }
-    if (hexdec($b) > 150) { $b = dechex(hexdec($b) - 100); }
-
-    if (strlen($r) < 2) { $r = "0$r"; }
-    if (strlen($g) < 2) { $g = "0$g"; }
-    if (strlen($b) < 2) { $b = "0$b"; }
-
-    return "$r$g$b";
-}
-
-function text_to_light_colour($text)
-{
-    // this hash should be the same as for text_to_color for best colour matching results
-    if (strlen($text) < 20) { $text .= "$text$text$text.kittens_kittens_kittens"; }
-
-    $rgb = substr( md5($text), 0, 6 );
-
-    return 'e' . substr($rgb, 1, 1) . 'e' . substr($rgb, 3, 1) . 'e' . substr($rgb, 5, 1);
 }
 
 ?><!doctype html>
@@ -107,13 +58,17 @@ span.channel {
 span.nick {
     color: #3F3;
 }
+small.title {
+    color: #666;
+}
 </style>
 </head>
 <body>
 <?php
 
-$result = mysqli_query($dbh, 'SELECT 
+$sth = mysqli_query($dbh, 'SELECT 
 
+    message.id AS `message_id`,
     channel.name AS `channel_name`, 
     nick.nick AS `nick_name`, 
     message.message_line AS `message_line`,
@@ -126,60 +81,108 @@ $result = mysqli_query($dbh, 'SELECT
     LEFT JOIN channel ON (message.channel_id = channel.id) 
 
     ORDER BY message.id DESC 
-    LIMIT 0,50');
+    LIMIT 50');
 
-if (!$result) {
+if (!$sth) {
     echo "<h1>Query of urls failed.</h1>";
     exit;
 }
 
-if ($result->num_rows == 0) {
+if ($sth->num_rows == 0) {
     echo "<p>No urls have been caught yet. Check back later.</p>";
-    exit;
+} else {
+
+    while ($row = mysqli_fetch_assoc($sth)) {
+        $message_id   = $row['message_id'];
+        $channel_name = $row['channel_name'];
+        $nick_name    = $row['nick_name'];
+        $message_line = $row['message_line'];
+        $message_date = $row['message_date'];
+        $channel_code = $row['channel_code'];
+        $nick_code    = $row['nick_code'];
+
+        $message_line = htmlspecialchars($message_line);
+        #$message_line = urlify($message_line);
+
+        $channel_colour    = text_to_dark_colour($channel_code);
+        $channel_colour_bg = text_to_light_colour($channel_code);
+        $nick_colour       = text_to_dark_colour($nick_code);
+
+        # e.g.: Friday, 6th November 2009 @ 3:07 pm HKT
+        $message_date      = date('l, jS F Y @ g:i a T', 
+            mktime(
+                substr($message_date, 11, 2),
+                substr($message_date, 14, 2),
+                substr($message_date, 17, 2),
+                substr($message_date, 5, 2),
+                substr($message_date, 8, 2),
+                substr($message_date, 0, 4)
+            )
+        );
+
+        // warning: quite hacky
+        $sth2 = mysqli_query($dbh, "SELECT id,url,html_title,redirects_to_id FROM url LEFT JOIN url_to_message ON (url.id = url_to_message.url_id) WHERE (url_to_message.message_id = $message_id)");
+        if (($sth2) && ($sth2->num_rows)) {
+            while ($row2 = mysqli_fetch_assoc($sth2)) {
+                $url_id          = $row2['id'];
+                $url             = $row2['url'];
+                $html_title      = $row2['html_title'];
+                $redirects_to_id = $row2['redirects_to_id'];
+
+                $alink_title = '';
+                if ($redirects_to_id) {
+                    // todo: can this be done as part of the above query?
+                    $sth3 = mysqli_query($dbh, "SELECT url FROM url WHERE (id = $redirects_to_id)");
+                    if (!$sth3) {
+                        echo $dbh->error;
+                        continue;
+                    }
+                    $row3 = mysqli_fetch_assoc($sth3);
+                    $redirect_url = $row3['url'];
+                    $alink_title = $redirect_url;
+                }
+
+                $display_url = $url;
+                if (substr($display_url, 0, 7) == 'http://') {
+                    $display_url = substr($display_url, 7);
+                    $display_url = preg_replace('/\/$/', '', $display_url);
+                }
+                $alink = "<a href=\"$url\" title=\"$alink_title\">$display_url</a>";
+
+                if ($html_title) {
+                    $html_title = htmlspecialchars($html_title, ENT_QUOTES);
+                    $alink .= " <small class=\"title\">($html_title)</small>";
+                }
+
+                $url_tag = preg_quote("[urlcatcher:$url_id]");
+
+                $message_line = preg_replace("/$url_tag/", $alink, $message_line);
+            }
+        }
+
+        printf("
+            <div class='channel' style='background-color:#%s'>
+            <span class='channel' style='color:#%s' title='$message_date'>%s</span>
+            <span class='nick' style='color:#%s'>&lt;%s&gt;</span> 
+            <span class='message'>%s</span>
+            </div>\n", 
+            $channel_colour_bg, 
+            $channel_colour, 
+            $channel_name, 
+            $nick_colour, 
+            $nick_name, 
+            $message_line);
+    }
+
 }
 
-while ($row = mysqli_fetch_assoc($result)) {
-    $channel_name = $row['channel_name'];
-    $nick_name    = $row['nick_name'];
-    $message_line = $row['message_line'];
-    $message_date = $row['message_date'];
-    $channel_code = $row['channel_code'];
-    $nick_code    = $row['nick_code'];
-
-    $message_line = htmlspecialchars($message_line);
-    $message_line = urlify($message_line);
-
-    $channel_colour    = text_to_dark_colour($channel_code);
-    $channel_colour_bg = text_to_light_colour($channel_code);
-    $nick_colour       = text_to_dark_colour($nick_code);
-
-    # e.g.: Friday, 6th November 2009 @ 3:07 pm HKT
-    $message_date      = date('l, jS F Y @ g:i a T', 
-        mktime(
-            substr($message_date, 11, 2),
-            substr($message_date, 14, 2),
-            substr($message_date, 17, 2),
-            substr($message_date, 5, 2),
-            substr($message_date, 8, 2),
-            substr($message_date, 0, 4)
-        )
-    );
-
-    printf("
-        <div class='channel' style='background-color:#%s' title='$message_date'>
-        <span class='channel' style='color:#%s'>%s</span>
-        <span class='nick' style='color:#%s'>&lt;%s&gt;</span> 
-        <span class='message'>%s</span>
-        </div>\n", 
-        $channel_colour_bg, 
-        $channel_colour, 
-        $channel_name, 
-        $nick_colour, 
-        $nick_name, 
-        $message_line);
-}
+mysqli_close($dbh);
 
 ?>
 </body>
 </html>
+<?php
+
+// trigger pool update
+include('pool-update.php');
 

@@ -2,11 +2,25 @@
 # URL catcher
 # This is an irssi script that watches configured channel(s) for URLS and stores them in a MySQL database.
 #
-# Usage: 
+# on the server, create a seperate client user as follows (change host/password as required):
+#  mysql> grant insert on urlcatcher.pool to `uc_client`@`localhost` identified by 'mj5S53dSekO5';
+#
+# also create an entry in the `client` table so the server will allow their submissions (change details as required):
+#  mysql> insert into client (id,contact_name,contact_email,ref,enabled,created_at) values('hiKUJEoLj-l2[grR','Mr Bean','mr.bean@example.com','bean at work',1,NOW());
+#  `id` is a unique 32 character key (consider it like a password) if the client/server does not match, the server will ignore the client
+#  `ref` is a free text reference about this client (a note/comment)
+#  `enabled` should be set to 1 otherwise the server will ignore the client
+#
+# Client Usage: 
 #	1) Save this script in ~/.irssi/scripts
 #	2) Start irssi
 #	3) /script load urlcatcher
 #   4) Change config with /set commands
+#      E.g.: /set storage_password letmein123
+#            /set storage_client_id foobarbaz123
+#            /set channels *
+#            /set ignore_nicks mrbean
+#            etc...
 #
 
 use strict;
@@ -84,31 +98,6 @@ sub is_msg_dupe
 
 	return 0;
 }
-
-#sub get_urls 
-#{
-#	my $text = shift;
-#
-#	my $urls = '(http|https|ftp|spotify)';
-#	my $ltrs = '\w';
-#	my $gunk = '/#~:.?+=&;%@!\-';
-#	my $punc = '.:?\-';
-#	my $any  = "${ltrs}${gunk}${punc}";
-#
-#    $_ = $text;
-#	my @matches = m/\b($urls:[$any]+?)(?=[$punc]*[^$any]|$)/igo;
-#
-#	my $ignore_urls_list = Irssi::settings_get_str('ignore_urls');
-#
-#    @matches = grep(!/($ignore_urls_list)/, @matches);
-#
-#    # hack hack hack
-#    # @matches contains an element that is just the url protocol, e.g. ^http$
-#    # better to fix the above regex so it doesn't match than weed it out here
-#    @matches = grep(!/^$urls$/, @matches);
-#
-#	return @matches;
-#}
 
 sub has_url 
 {

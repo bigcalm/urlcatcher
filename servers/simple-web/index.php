@@ -40,7 +40,9 @@ if (!$dbh) {
 <meta name="contact" content="<?=$CONTACT?>">
 <meta name="url" content="<?=$URL?>">
 <meta name="license" content="<?=$LICENSE?>">
+<noscript>
 <meta http-equiv="refresh" content="60">
+</noscript>
 <style type="text/css">
 body {
     margin: 0;
@@ -81,7 +83,7 @@ $sth = mysqli_query($dbh, 'SELECT
     LEFT JOIN channel ON (message.channel_id = channel.id) 
 
     ORDER BY message.id DESC 
-    LIMIT 50');
+    LIMIT 90');
 
 if (!$sth) {
     echo "<h1>Query of urls failed.</h1>";
@@ -101,8 +103,8 @@ if ($sth->num_rows == 0) {
         $channel_code = $row['channel_code'];
         $nick_code    = $row['nick_code'];
 
-        $message_line = htmlspecialchars($message_line);
-        #$message_line = urlify($message_line);
+        //$message_line = htmlspecialchars($message_line);
+        //$message_line = urlify($message_line);
 
         $channel_colour    = text_to_dark_colour($channel_code);
         $channel_colour_bg = text_to_light_colour($channel_code);
@@ -121,8 +123,9 @@ if ($sth->num_rows == 0) {
         );
 
         // warning: quite hacky
+        $errors = 0;
         $sth2 = mysqli_query($dbh, "SELECT id,url,html_title,redirects_to_id FROM url LEFT JOIN url_to_message ON (url.id = url_to_message.url_id) WHERE (url_to_message.message_id = $message_id)");
-        if (($sth2) && ($sth2->num_rows)) {
+        if (($sth2) and ($sth2->num_rows)) {
             while ($row2 = mysqli_fetch_assoc($sth2)) {
                 $url_id          = $row2['id'];
                 $url             = $row2['url'];
@@ -150,23 +153,40 @@ if ($sth->num_rows == 0) {
                 $alink = "<a href=\"$url\" title=\"$alink_title\">$display_url</a>";
 
                 if ($html_title) {
-                    $html_title = htmlspecialchars($html_title, ENT_QUOTES);
+                    //$html_title = htmlspecialchars($html_title, ENT_QUOTES);
                     $alink .= " <small class=\"title\">($html_title)</small>";
                 }
 
                 $url_tag = preg_quote("[urlcatcher:$url_id]");
 
-                $message_line = preg_replace("/$url_tag/", $alink, $message_line);
+                if (preg_match("/$url_tag/", $message_line)) {
+                    $message_line = preg_replace("/$url_tag/", $alink, $message_line);
+                } else { 
+                    // this shouldn't happen!
+                    // merge_url_ids_to_message() must have failed
+                    // abandon this message
+                    $errors++;
+                    break;
+                }
+
             }
+        } else {
+            // this shouldn't happen!
+            // no matching record in url_to_message
+            // abandon this message
+            $errors++;
         }
 
+        if ($errors) { continue; }
+
         printf("
-            <div class='channel' style='background-color:#%s'>
+            <div class='channel' style='background-color:#%s' id='msgid%u'>
             <span class='channel' style='color:#%s' title='$message_date'>%s</span>
             <span class='nick' style='color:#%s'>&lt;%s&gt;</span> 
             <span class='message'>%s</span>
             </div>\n", 
             $channel_colour_bg, 
+            $message_id,
             $channel_colour, 
             $channel_name, 
             $nick_colour, 

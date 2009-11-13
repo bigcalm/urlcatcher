@@ -10,14 +10,29 @@ require_once('functions_backend.php');
 
 #if ($_GET['toby'] != '1') { echo "No pool cleaner for you!"; exit; }
 
-// todo: ignore 'http://'
-//       follow meta redirects e.g. <META http-equiv="refresh" content="0;URL=http://www.thejesustv.com/main/">
-//       the whole inserting of network/channel/nick/message/url records should probably be a transaction as there are many places for an error to leave us in a bad state
+// todo: 
+//      the whole inserting of network/channel/nick/message/url records should probably be a transaction as there are many places for an error to leave us in a bad state
+//      this link didn't get urlified or its id wasn't merged (id:145) "http://www.scanwith.com/download_soft.php?d=2224&s=491 try that link Nautilus"
+//      & in <title>: (What once was &quot;the most secure&quot; is now the most vulnerable browser : reddit.com)
+//      redirects to an https are not handled correctly, we try to connect to them on port 80 for a start
 
 echo "<br><br><pre>Pool Cleaner(tm)\n\n";
 
 @flush();
 
+// create a seperate pool manager user as such:
+// mysql> grant insert,select,delete on urlcatcher.* to `uc_poolman`@`localhost` identified by 'rmiIgUmpkTeC';
+//
+// or for greater security, give them only the access they need:
+// mysql> grant select,delete on urlcatcher.pool    to `uc_poolman`@`localhost` identified by 'rmiIgUmpkTeC';
+// mysql> grant select,insert on urlcatcher.url     to `uc_poolman`@`localhost` identified by 'rmiIgUmpkTeC';
+// mysql> grant select,insert on urlcatcher.message to `uc_poolman`@`localhost` identified by 'rmiIgUmpkTeC';
+// mysql> grant select,insert on urlcatcher.channel to `uc_poolman`@`localhost` identified by 'rmiIgUmpkTeC';
+// mysql> grant select,insert on urlcatcher.network to `uc_poolman`@`localhost` identified by 'rmiIgUmpkTeC';
+// mysql> grant select,insert on urlcatcher.nick    to `uc_poolman`@`localhost` identified by 'rmiIgUmpkTeC';
+// mysql> grant select        on urlcatcher.client  to `uc_poolman`@`localhost` identified by 'rmiIgUmpkTeC';
+// mysql> grant insert        on urlcatcher.url_to_message to `uc_poolman`@`localhost` identified by 'rmiIgUmpkTeC';
+// mysql> flush privileges;
 $db_hostname = 'localhost';
 $db_database = 'urlcatcher';
 $db_username = 'uc_poolman';
@@ -31,8 +46,8 @@ if (!$dbh) {
 
 // get new pool items
 // - we ignore items created in the last 30 seconds to avoid us updating more often than necessary
-// - by joining with client we can immediatley discard any pool items that came from invalid/disabled clients
-// todo: clear out pool of items that came from invalid/disabled clients
+// - by joining with the `client` table we can immediatley discard any pool items that came from invalid/disabled clients
+// todo: clear out pool of items that came from invalid/disabled clients... a pool caretaker script
 $sth = $dbh->query('
     SELECT 
     pool.id AS `pool_id`,
@@ -44,8 +59,8 @@ $sth = $dbh->query('
     LEFT JOIN client ON (pool.client_id = client.id) 
     WHERE 
     client.enabled = 1 AND
-    DATE_SUB(NOW(), INTERVAL 5 SECOND) > pool.created_at
-    LIMIT 1');
+    DATE_SUB(NOW(), INTERVAL 30 SECOND) > pool.created_at
+    LIMIT 8');
 
 if (!$sth) {
     echo "<h1>Query of pool failed.</h1>";
@@ -81,7 +96,7 @@ foreach ($rows as $row) {
     clean_pool($dbh, $pool_id);
 
     $urls = get_urls($message);
-    if (count($urls) == 0) { return next; }
+    if (count($urls) == 0) { exit; }
 
     echo "$pool_id: ";
     echo 'urls=' . count($urls) . ' ';

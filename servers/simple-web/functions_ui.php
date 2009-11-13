@@ -8,7 +8,7 @@
 
 function urlify($text)
 {
-	$urls = '(http|https|telnet|gopher|file|wais|ftp)';
+	$urls = '(http|https|telnet|gopher|file|wais|ftp|spotify)';
 	$ltrs = '\w';
 	$gunk = '\\/#~:,.?+=&;%@!\-';
 	$punc = ',.:?\-';

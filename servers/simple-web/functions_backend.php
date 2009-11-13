@@ -11,7 +11,7 @@ function get_urls($text)
 {
     if (!$text) { return array(); }
 
-	$urls = '(http|https|telnet|gopher|file|wais|ftp)';
+	$urls = '(http|https|telnet|gopher|file|wais|ftp|spotify)';
 	$ltrs = '\w';
 	$gunk = '\\/#~:,.?+=&;%@!\-';
 	$punc = ',.:?\-';
@@ -369,6 +369,13 @@ function insert_urls_from_pool($dbh, $network_id, $channel_id, $nick_id, $messag
 
     }
 
+    if (count($complete_urls) != count($urls)) {
+        // one or more of the urls failed to insert
+        // abandon this message
+        echo "\n\n<strong>complete_urls != urls - this message will be ignored but some urls may already have been inserted</strong>\n\n";
+        return 0;
+    }
+
     $message = merge_url_ids_to_message($message, $complete_urls);
 
     // finally record the message 
@@ -441,7 +448,7 @@ function get_empty_http_meta()
 
 function get_http_meta($url, $depth = 0, $status_chain = '', $url_chain = '')
 {
-    echo "get_http_meta('$url', $depth)\n";
+    //echo "get_http_meta('$url', $depth)\n";
     // how deep to follow http redirects
     if ($depth > 3) { return; }
     $depth++;
@@ -522,7 +529,7 @@ function get_http_meta($url, $depth = 0, $status_chain = '', $url_chain = '')
     fclose($sock);
 
     $http_status = get_http_status($contents);
-    echo "http_status=$http_status\n";
+    //echo "http_status=$http_status\n";
     if (!is_numeric($http_status)) { return $http_meta; }
     $http_meta['http_status'] = $http_status;
     $http_meta['location'] = $url;
@@ -571,20 +578,48 @@ function get_http_meta($url, $depth = 0, $status_chain = '', $url_chain = '')
                 $http_meta['html_title'] = get_html_h1($contents);
             }
         } else {
-            echo "(non text/html type) ";
+            //echo "(non text/html type) ";
+        }
+
+        // html meta redirect?
+        // this could be placed better to avoid doing all the work above
+        $html_meta_redirect = get_html_meta_redirect($contents);
+        if ($html_meta_redirect) {
+            $http_meta = get_http_meta($html_meta_redirect, $depth);
+            $http_meta['redirect'] = 1;
         }
     }
 
     return $http_meta;
 }
 
+// we don't handle relative urls
+function get_html_meta_redirect($text)
+{
+    //echo "get_html_meta_redirect() ";
+    if (!$text) { return ''; }
+
+    preg_match('/<meta\s+http-equiv="refresh"\s+content="0;\s*url=\s*(http:\/\/[^"\s]+)">/i', $text, $matches);
+    if (count($matches) == 0) { 
+        //echo '(no meta redirect or failed regex) '; 
+        return ''; 
+    }
+
+    $html_meta_redirect = $matches[1];
+
+    return $html_meta_redirect;
+}
+
 function get_html_title($text)
 {
-    echo "get_html_title() ";
+    //echo "get_html_title() ";
     if (!$text) { return ''; }
 
     preg_match('/<title[^>]*>([^<]+)<\/title>/i', $text, $matches);
-    if (count($matches) == 0) { echo '(no &lt;title&gt; or failed regex) '; return ''; }
+    if (count($matches) == 0) { 
+        //echo '(no &lt;title&gt; or failed regex) '; 
+        return ''; 
+    }
 
     $html_title = $matches[1];
 
@@ -599,11 +634,14 @@ function get_html_title($text)
 
 function get_html_h1($text)
 {
-    echo "get_html_h1() ";
+    //echo "get_html_h1() ";
     if (!$text) { return ''; }
 
     preg_match('/<h1[^>]*>(.*?)<\/h1>/i', $text, $matches);
-    if (count($matches) == 0) { echo '(no &lt;h1&gt; or failed regex) '; return ''; }
+    if (count($matches) == 0) { 
+        //echo '(no &lt;h1&gt; or failed regex) '; 
+        return ''; 
+    }
 
     $html_h1 = $matches[1];
 

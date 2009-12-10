@@ -358,7 +358,6 @@ function insert_urls_from_pool($dbh, $network_id, $channel_id, $nick_id, $messag
             }
 
             // store the new url
-            echo "\n";
             print_r($http_meta);
             $url_id = insert_url($dbh, $url, $http_meta['state'], $http_meta['content_length'], $http_meta['content_type'], $redirects_to_id, $http_meta['html_title']);
             if ($url_id === FALSE) { continue; }

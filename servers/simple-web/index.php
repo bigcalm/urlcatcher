@@ -40,9 +40,7 @@ if (!$dbh) {
 <meta name="contact" content="<?=$CONTACT?>">
 <meta name="url" content="<?=$URL?>">
 <meta name="license" content="<?=$LICENSE?>">
-<noscript>
 <meta http-equiv="refresh" content="60">
-</noscript>
 <style type="text/css">
 body {
     margin: 0;
@@ -204,5 +202,5 @@ mysqli_close($dbh);
 <?php
 
 // trigger pool update
-include('pool-update.php');
+//include('pool-update.php');
 

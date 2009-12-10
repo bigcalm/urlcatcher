@@ -16,7 +16,7 @@ require_once('functions_backend.php');
 //      & in <title>: (What once was &quot;the most secure&quot; is now the most vulnerable browser : reddit.com)
 //      redirects to an https are not handled correctly, we try to connect to them on port 80 for a start
 
-echo "<br><br><pre>Pool Cleaner(tm)\n\n";
+//echo "<br><br><pre>Pool Cleaner(tm)\n\n";
 
 @flush();
 
@@ -69,7 +69,7 @@ if (!$sth) {
 }
 
 if ($sth->num_rows == 0) { 
-    echo "The pool is empty.\n\n";
+    //echo "The pool is empty.\n\n";
     exit; 
 } else {
     echo "The pool has " . $sth->num_rows . " occupants (or I reached the maximum to read in this update).\n\n";
@@ -98,7 +98,7 @@ foreach ($rows as $row) {
     $urls = get_urls($message);
     if (count($urls) == 0) { exit; }
 
-    echo "$pool_id: ";
+    echo "pool_id=$pool_id; ";
     echo 'urls=' . count($urls) . ' ';
 
     $network_id = get_network_id($dbh, $cache, $network_name);
